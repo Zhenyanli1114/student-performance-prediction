@@ -71,3 +71,9 @@ By the final deadline, I expect to have:
 - final plots and result summaries
 - short technical demo video
 - explanation of tradeoffs, limitations, and future improvements
+
+## Dataset
+
+Cortez, P. & Silva, A. (2008). Student Performance [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5TG7T
+
+> P. Cortez and A. Silva. "Using Data Mining to Predict Secondary School Student Performance." In A. Brito and J. Teixeira Eds., *Proceedings of 5th Future Business Technology Conference (FUBUTEC 2008)*, pp. 5-12, Porto, Portugal, April 2008, EUROSIS, ISBN 978-9077381-39-7.
