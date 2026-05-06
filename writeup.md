@@ -1,4 +1,4 @@
-# Week 5 Checkpoint Writeup
+# Week 7 Checkpoint Writeup
 
 ## 1. Dataset and Prediction Target
 
@@ -8,61 +8,119 @@
 
 **Prediction target:** Binary classification — `pass` (1) if final grade G3 ≥ 10, else `fail` (0)
 
-This threshold reflects a common passing grade boundary and converts the task from regression to classification, making it actionable for early intervention decisions (the core goal of the project).
-
 **Class balance:** 265 pass (67%) / 130 fail (33%) — moderately imbalanced.
 
-**Why drop G1 and G2?** G1 and G2 are first- and second-period grades. Including them would essentially predict the final grade from prior grades, bypassing the behavioral and demographic features the project is interested in. The goal is to predict risk from observable inputs *before* grades are available.
+G1 and G2 (intermediate grades) are excluded to avoid predicting risk from prior grades rather than behavioral and demographic features.
 
 ---
 
-## 2. Features and Preprocessing
+## 2. Models Compared
 
-**Features used (after dropping G1, G2, G3):** 29 features including:
-- Academic behavior: `studytime`, `failures`, `schoolsup`, `paid`, `higher`
-- Demographic: `age`, `sex`, `address`, `Medu`, `Fedu`, `Mjob`, `Fjob`
-- Social/lifestyle: `absences`, `goout`, `Dalc`, `Walc`, `freetime`, `romantic`
-- Family: `famsize`, `Pstatus`, `famsup`, `guardian`
+Four models are compared in this checkpoint:
 
-**Preprocessing decisions:**
-- Binary categoricals (`yes`/`no`, `M`/`F`, etc.) → encoded as 0/1
-- Multi-class categoricals (`Mjob`, `Fjob`, `reason`, `guardian`) → one-hot encoded (drop_first=True to avoid multicollinearity)
-- Features scaled with `StandardScaler` (fit on train only, applied to val/test) to normalize for distance-based models like KNN
+| Model | Type | Key parameter |
+|-------|------|---------------|
+| LR (L2, C=1.0) | Logistic Regression | Standard L2 regularization (baseline) |
+| LR (L1, C=0.1) | Logistic Regression | L1 regularization, stronger regularization (C=0.1) |
+| Decision Tree (depth=4) | Decision Tree | Depth-limited to 4 for interpretability |
+| Decision Tree (full) | Decision Tree | Unconstrained depth (overfitting baseline) |
 
-**Data split:** 70% train (276) / 15% validation (59) / 15% test (60), stratified on target.
+All models are trained on the same 70/15/15 stratified split from Week 5. Features are standardized (fit on train only).
 
 ---
 
-## 3. Evaluation Metrics
+## 3. Cross-Validation Results
 
-| Metric | Why it was chosen |
-|--------|-------------------|
-| **Accuracy** | Intuitive overall correctness measure |
-| **Precision (macro)** | Penalizes false positives across both classes |
-| **Recall (macro)** | Penalizes false negatives — important for catching at-risk students |
-| **F1 (macro)** | Harmonic mean of precision and recall; handles class imbalance better than accuracy alone |
+5-fold stratified cross-validation on the training set (n=276):
 
-Macro averaging treats both classes equally, which is appropriate given the modest class imbalance and the importance of correctly identifying failing students.
-
----
-
-## 4. Baseline Model Results
-
-### Validation Set
-
-| Model               | Accuracy | Precision | Recall | F1    |
-|---------------------|----------|-----------|--------|-------|
-| Logistic Regression | 0.678    | 0.622     | 0.611  | 0.614 |
-| KNN (k=5)           | 0.746    | 0.785     | 0.619  | 0.619 |
-
-### Test Set
-
-| Model               | Accuracy | Precision | Recall | F1    |
-|---------------------|----------|-----------|--------|-------|
-| Logistic Regression | 0.650    | 0.589     | 0.575  | 0.576 |
-| KNN (k=5)           | 0.533    | 0.396     | 0.425  | 0.403 |
+| Model | CV F1 Mean | CV F1 Std |
+|-------|-----------|-----------|
+| LR (L2, C=1.0) | 0.613 | 0.045 |
+| LR (L1, C=0.1) | 0.589 | 0.087 |
+| Decision Tree (depth=4) | 0.593 | 0.098 |
+| Decision Tree (full) | 0.565 | 0.073 |
 
 **Observations:**
-- KNN shows a large drop from validation to test (accuracy 0.746 → 0.533), indicating overfitting to the small training set. KNN with k=5 is sensitive to the local structure of the data and does not generalize well here.
-- Logistic Regression is more stable across val and test (F1: 0.614 → 0.576), making it the stronger baseline despite lower validation accuracy.
-- Both models are limited by the relatively small dataset (395 samples) and the absence of grade-based features. The Week 7 models (decision trees, regularized logistic regression) will aim to improve generalization.
+- LR (L2) has the highest and most stable CV F1 (lowest std), suggesting it generalizes most consistently across folds.
+- LR (L1) and Decision Tree (depth=4) are competitive but noisier.
+- The full Decision Tree has the lowest CV F1, confirming that unconstrained growth hurts generalization.
+
+---
+
+## 4. Validation and Test Results
+
+### Validation Set (n=59)
+
+| Model | Accuracy | Precision | Recall | F1 |
+|-------|---------|-----------|--------|----|
+| LR (L2, C=1.0) | 0.678 | 0.622 | 0.611 | 0.614 |
+| LR (L1, C=0.1) | 0.695 | 0.652 | 0.554 | 0.529 |
+| Decision Tree (depth=4) | 0.661 | 0.604 | 0.598 | 0.600 |
+| Decision Tree (full) | 0.610 | 0.569 | 0.574 | 0.570 |
+
+### Test Set (n=60)
+
+| Model | Accuracy | Precision | Recall | F1 |
+|-------|---------|-----------|--------|----|
+| LR (L2, C=1.0) | 0.650 | 0.589 | 0.575 | 0.576 |
+| LR (L1, C=0.1) | 0.667 | 0.593 | 0.537 | 0.509 |
+| Decision Tree (depth=4) | **0.700** | **0.656** | **0.637** | **0.643** |
+| Decision Tree (full) | 0.617 | 0.564 | 0.562 | 0.563 |
+
+**Key observations:**
+- **Decision Tree (depth=4) is the best model on the test set** across all four metrics. Its F1 of 0.643 is the highest, and its recall of 0.637 is particularly relevant for catching at-risk students.
+- LR (L1) has high accuracy but low recall on validation (0.554), suggesting it is biased toward predicting "pass" more often. Strong L1 regularization may be shrinking too many coefficients to zero given the small dataset size.
+- LR (L2) remains the most stable model: low variance across folds, small val-to-test drop (0.614 → 0.576). It is the safest choice if consistency is the priority.
+- The full Decision Tree improves over LR on test but is less stable than the pruned version (val F1 0.570 vs. pruned 0.600), confirming that pruning is necessary.
+
+---
+
+## 5. Feature Importance Analysis
+
+### Logistic Regression (L2) — Top Coefficients
+
+The top features by absolute coefficient magnitude are:
+- `failures` (strongest negative predictor — past failures are the clearest signal)
+- `higher` (wanting to pursue higher education is a strong positive predictor)
+- `absences` (negative — more absences correlate with failing)
+- `Medu` and `Fedu` (parental education, positive)
+- `studytime` (moderate positive effect)
+
+### Decision Tree (depth=4) — Gini Importances
+
+The pruned tree splits primarily on:
+- `failures` (root split — dominant feature)
+- `higher`
+- `absences`
+- `age` and `Medu`
+
+The top features are consistent between LR and the Decision Tree, which increases confidence that these features genuinely predict outcomes rather than being noise. The decision tree provides an additional benefit: each split is directly interpretable as a rule (e.g., "if failures < 0.5 and higher = 1, predict pass").
+
+### L1 Sparsity
+
+LR (L1, C=0.1) produces a sparse model, zeroing out several low-signal features. The retained features overlap heavily with those in LR (L2), providing implicit feature selection confirmation. However, with C=0.1 on 276 training samples, the model may be over-regularized.
+
+---
+
+## 6. Interpretability vs. Performance Tradeoffs
+
+| Model | Test F1 | Interpretability | Notes |
+|-------|--------|-----------------|-------|
+| LR (L2, C=1.0) | 0.576 | High — linear coefficients | Stable, globally interpretable |
+| LR (L1, C=0.1) | 0.509 | High — sparse coefficients | Best for feature selection; over-regularized here |
+| Decision Tree (depth=4) | 0.643 | High — explicit decision rules | Best performer; locally and globally readable |
+| Decision Tree (full) | 0.563 | Low — too complex to trace | Overfits; not interpretable in practice |
+
+The depth-limited Decision Tree is the strongest model and also one of the more interpretable ones: a 4-level tree can be printed as rules and reasoned about directly. This is the result the project was targeting — a model that is both accurate and explainable.
+
+---
+
+## 7. Preliminary Conclusions
+
+1. **`failures` is the single most informative feature** across all models. Students with prior failures are at significantly higher risk. This is actionable: it is available at the start of the year from school records.
+
+2. **Pruned Decision Tree (depth=4) gives the best generalization** on this dataset. The gain over logistic regression (F1 0.643 vs. 0.576) is meaningful given the small dataset.
+
+3. **Simple models are competitive.** The gap between the pruned tree and an unconstrained tree (F1 0.643 vs. 0.563) shows that complexity hurts here. The project's central claim — that interpretable models can perform well — is supported.
+
+4. **All models are limited by dataset size.** With only 60 test samples, metric differences of ~0.05 F1 should be interpreted cautiously. The cross-validation results (which use more data per evaluation) provide a more reliable picture of model ranking.

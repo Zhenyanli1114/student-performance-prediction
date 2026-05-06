@@ -1,29 +1,37 @@
-# Week 5 Reflection
+# Week 7 Reflection
 
 ## What I have achieved so far
 
-For the Week 5 checkpoint, I set up the full foundation of the project end-to-end. I found and downloaded a real dataset (UCI Student Performance, Math course), cleaned and preprocessed it, and made deliberate decisions about what the prediction target should be and which features to include. I built a reproducible data pipeline that handles encoding, scaling, and stratified train/val/test splitting. I ran exploratory data analysis and generated plots that helped me understand the class balance, the distribution of key features, and how those features relate to student outcomes. Finally, I implemented and evaluated two baseline models — logistic regression and KNN — and wrote up the results with proper evaluation metrics.
+For the Week 7 checkpoint, I added two new models (Decision Tree with depth=4 and an unconstrained Decision Tree) and a regularized Logistic Regression variant (L1, C=0.1), bringing the total to four models. I set up 5-fold stratified cross-validation on the training set to give a more reliable model comparison than a single val/test split. I generated feature importance plots for all four models and a visualization of the pruned decision tree's structure. I also wrote a full analysis of the interpretability vs. performance tradeoffs, which is the core question of the project.
 
 ## What I am happy with
 
-I'm happy with the decision to frame this as binary classification (pass/fail) rather than regression on the raw grade. It makes the task more actionable and directly relevant to the early intervention framing in my project proposal. I'm also glad I thought through the feature leakage issue with G1 and G2 early — dropping them was the right call and I think it makes the project more honest about what it's actually predicting.
+The most satisfying result is that the depth-limited Decision Tree outperformed both logistic regression variants on the test set (F1 0.643 vs. 0.576) while remaining interpretable. This directly supports the project's main claim that simple, explainable models can perform well enough to be useful in an early intervention context. The fact that the top features — `failures`, `higher`, `absences` — are consistent across all four models increases confidence in those findings.
 
-The EDA plots came out clean and readable, and the results table in the writeup ended up being a genuinely interesting finding: KNN looked better on validation but collapsed on the test set, while logistic regression was more stable. That kind of result is more interesting to analyze than if both models had performed the same way.
+I'm also glad I caught a silent bug in the L1 logistic regression setup. The version of scikit-learn being used (1.8+) deprecated the `penalty` parameter, and using `penalty='l1'` without also setting `l1_ratio=1` caused the model to silently run as L2 with a different C. Fixing this changed the L1 results meaningfully, so it mattered for the analysis.
 
-## What I am struggling with / challenges ahead
+The decision to use 5-fold CV on the training set rather than relying solely on the val split was the right call — the val set (n=59) is too small to trust a single evaluation.
 
-The dataset is small (395 students), which makes it hard to draw confident conclusions — the val and test sets are only ~59 and 60 samples each, so metrics can swing a lot with a few predictions. I'm a bit worried about whether my results will be reliable enough to make strong claims about model comparisons in Week 7.
+## What I am struggling with
 
-I'm also unsure about how much feature engineering I should do. Right now I'm using the raw features with minimal transformation. For Week 7, I'm considering things like interaction terms or binning absences, but I don't want to overfit to this specific dataset either.
+The small dataset continues to be the main challenge. Even with cross-validation, the folds are only ~55 samples for validation per split, which leads to high variance in per-fold scores (CV std of 0.087 for LR L1 is high). I'm uncertain whether the Decision Tree's test advantage over logistic regression is a real effect or just favorable test-set random variation.
 
-The interpretability angle of the project (the core research question) is something I haven't tackled yet — I've just been focused on getting the pipeline working. I need to think more carefully about how to actually measure and compare interpretability across models, not just performance.
+The L1 model with C=0.1 may be over-regularized for 276 training samples — it achieves high accuracy by biasing toward "pass" predictions, hurting recall. I haven't done a proper sweep over C values. For the final checkpoint I should either tune this more carefully or drop the L1 model in favor of something more clearly differentiated.
+
+The interpretability analysis is mostly qualitative right now. I'm comparing feature importances visually and listing top features, but I don't have a rigorous measure of "how interpretable" each model is. I'm planning to formalize this for the final deliverable, possibly by counting decision paths or measuring the number of active features.
+
+## What I'm planning for the final checkpoint
+
+- Tune regularization strength more carefully, at minimum checking a few C values for the L1 model.
+- Add a short discussion of what the decision tree rules say in plain English, making the interpretability argument more concrete.
+- Consider whether to add one more comparison (e.g., a Random Forest) as a performance ceiling to show how much interpretable models give up.
+- Finalize code documentation and repo structure for the submission.
+- Record the final demo video walkthrough.
 
 ## Feedback I'd like from course staff
 
-I'd especially appreciate feedback on:
+1. **Decision Tree vs. LR gap** — The pruned Decision Tree has a notably higher test F1 (0.643 vs. 0.576) than LR. Is this difference large enough to draw conclusions on a dataset of this size, or should I treat it more cautiously?
 
-1. **Feature selection** — Is it appropriate to keep all 29 features, or should I be doing some form of selection before modeling? I want to avoid the models picking up noise, especially with such a small dataset.
+2. **Interpretability operationalization** — Is listing feature importances and decision rules sufficient to claim a model is "interpretable," or is there a more rigorous standard I should be meeting for the final deliverable?
 
-2. **The leakage decision** — I dropped G1 and G2 to avoid predicting grades from grades. Does that framing make sense, or is there a case for including them given that the goal is early intervention (where some grade data might realistically be available)?
-
-3. **Interpretability measurement** — For Week 7, I plan to compare decision trees and logistic regression on interpretability. Is there a recommended way to operationalize "interpretability" beyond just looking at feature importances? I want the comparison to feel rigorous and not just qualitative.
+3. **L1 model** — Given that LR (L1, C=0.1) underperforms, is it worth keeping in the final comparison as a demonstration of what over-regularization looks like, or does it weaken the overall narrative?
