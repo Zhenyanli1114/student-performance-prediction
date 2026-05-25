@@ -1,73 +1,60 @@
 # Interpretable Student Performance Prediction
 
-## Project Prompt
+Binary classification project predicting whether a student will pass or fail their math course using behavioral and demographic features. The central question: **can simple, interpretable models perform well enough to support early academic intervention decisions?**
 
-I would like to build a small, interpretable machine learning pipeline that predicts student academic outcomes based on behavioral and academic features such as study time, attendance, prior grades, and assignment patterns. The purpose of the project is not only to make predictions, but also to understand which features are most useful and which models provide the best balance of accuracy and explainability.
+Dataset: UCI Student Performance Dataset (Math course) — 395 students, 30 features, sourced from Paulo Cortez, University of Minho (2008).
 
-Because this is a course project rather than a production intervention system, I will use a public educational dataset and focus on a manageable binary or multiclass prediction task, such as predicting whether a student is at risk of low final performance. I will compare a few standard supervised learning methods covered by the course, such as logistic regression, k-nearest neighbors, decision trees, and possibly a simple ensemble if feasible.
+---
 
-The core question of the project is: **can simple and explainable models predict student outcomes well enough to support early intervention decisions, and what tradeoffs exist between model performance and interpretability?**
+## Setup
 
-The final deliverable will be a reproducible Python project that:
-1. cleans and explores the dataset,
-2. trains several supervised learning models,
-3. compares them using honest evaluation methods,
-4. analyzes feature importance or decision logic,
-5. presents conclusions about which models are most appropriate for a small educational prediction setting.
+```bash
+pip install -r requirements.txt
+```
 
-This project fits the course because it uses supervised learning, model evaluation, and tradeoff analysis, all of which are central themes of the syllabus.
+---
 
-## Execution Plan
+## How to Run
 
-### By Week 5 Homework Deadline
+Run the scripts in order:
 
-- Select a public student performance dataset and define a specific prediction target.
-- Clean the data and perform exploratory data analysis.
-- Build a train/validation/test workflow.
-- Implement at least two simple baseline models, such as logistic regression and k-nearest neighbors.
-- Choose evaluation metrics such as accuracy, precision/recall, or F1 depending on class balance.
+```bash
+python data_pipeline.py   # download data, clean, encode, split into train/val/test
+python eda.py             # exploratory data analysis plots
+python baseline_models.py # logistic regression and KNN baselines
+python week7_models.py    # model comparisons, cross-validation, feature importance
+```
 
-This step matters because the course emphasizes honest evaluation and avoiding misleading model comparisons.
+All plots are saved to `plots/`.
 
-#### Week 5 Artifacts
+---
 
-By this checkpoint, I expect to have:
-- cleaned dataset pipeline
-- exploratory data analysis plots
-- baseline model results
-- a short writeup explaining the target, features, and metrics
+## File Structure
 
-### By Week 7 Homework Deadline
+```
+data_pipeline.py     — downloads and cleans the UCI dataset, produces train/val/test splits
+eda.py               — EDA plots (class distribution, feature distributions, correlation heatmap)
+baseline_models.py   — Week 5 baselines: Logistic Regression (L2) and KNN
+week7_models.py      — Week 7 models: LR (L2), LR (L1), Decision Tree (depth=4), Decision Tree (full)
+                       includes 5-fold CV, feature importance plots, confusion matrices
+data/                — raw CSV and train/val/test splits (70/15/15 stratified split)
+plots/               — all generated figures
+writeup.md           — full analysis writeup with results, interpretability discussion, and conclusions
+```
 
-- Add stronger or more interpretable models such as decision trees or regularized logistic regression.
-- Compare models using cross-validation or a comparable evaluation procedure.
-- Analyze which features appear most informative.
-- Create plots and tables comparing performance and interpretability.
+---
 
-This step matters because the syllabus highlights evaluation, overfitting control, and comparing methods rather than just building one model.
+## Key Results
 
-#### Week 7 Artifacts
+Four models were compared using 5-fold stratified cross-validation and a held-out test set (n=60):
 
-By this checkpoint, I expect to have:
-- 3 to 4 model comparisons
-- metric summary tables
-- interpretability analysis
-- preliminary conclusions about tradeoffs
+| Model | CV F1 | Test F1 |
+|-------|-------|---------|
+| LR (L2, C=1.0) | 0.613 | 0.576 |
+| LR (L1, C=0.1) | 0.589 | 0.509 |
+| Decision Tree (depth=4) | 0.593 | **0.643** |
+| Decision Tree (full) | 0.565 | 0.563 |
 
-### By the Final Due Date
+**The pruned Decision Tree (depth=4) is the best model**, achieving the highest test F1 while remaining fully interpretable as a set of human-readable rules. The most informative features across all models are `failures` (prior course failures), `higher` (intent to pursue higher education), and `absences`.
 
-- Finalize code and documentation.
-- Refine conclusions about which model is most suitable and why.
-- Prepare final artifacts and README.
-- Record a final video showing the project workflow, code organization, model comparisons, and tradeoffs.
-
-The final video will demonstrate how the project works, show the code structure, and explain implementation tradeoffs, in line with the final project requirements.
-
-#### Final Artifacts
-
-By the final deadline, I expect to have:
-- complete repo
-- polished README
-- final plots and result summaries
-- short technical demo video
-- explanation of tradeoffs, limitations, and future improvements
+See [writeup.md](writeup.md) for the full analysis.

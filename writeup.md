@@ -1,4 +1,4 @@
-# Week 7 Checkpoint Writeup
+# Final Writeup: Interpretable Student Performance Prediction
 
 ## 1. Dataset and Prediction Target
 
@@ -14,7 +14,37 @@ G1 and G2 (intermediate grades) are excluded to avoid predicting risk from prior
 
 ---
 
-## 2. Models Compared
+## 2. Features and Preprocessing
+
+**Features used (after dropping G1, G2, G3):** 29 features including:
+- Academic behavior: `studytime`, `failures`, `schoolsup`, `paid`, `higher`
+- Demographic: `age`, `sex`, `address`, `Medu`, `Fedu`, `Mjob`, `Fjob`
+- Social/lifestyle: `absences`, `goout`, `Dalc`, `Walc`, `freetime`, `romantic`
+- Family: `famsize`, `Pstatus`, `famsup`, `guardian`
+
+**Preprocessing decisions:**
+- Binary categoricals (`yes`/`no`, `M`/`F`, etc.) → encoded as 0/1
+- Multi-class categoricals (`Mjob`, `Fjob`, `reason`, `guardian`) → one-hot encoded (`drop_first=True` to avoid multicollinearity)
+- Features scaled with `StandardScaler` fit on train only and applied to val/test, to prevent data leakage and to normalize for distance-based models like KNN
+
+**Data split:** 70% train (276) / 15% validation (59) / 15% test (60), stratified on the target label.
+
+---
+
+## 3. Evaluation Metrics
+
+| Metric | Why it was chosen |
+|--------|-------------------|
+| **Accuracy** | Intuitive overall correctness measure |
+| **Precision (macro)** | Penalizes false positives across both classes |
+| **Recall (macro)** | Penalizes false negatives — important for catching at-risk students |
+| **F1 (macro)** | Harmonic mean of precision and recall; handles class imbalance better than accuracy alone |
+
+Macro averaging treats both classes equally, which is appropriate given the modest class imbalance (67% pass / 33% fail) and the importance of correctly identifying the failing minority.
+
+---
+
+## 4. Models Compared
 
 Four models are compared in this checkpoint:
 
@@ -27,9 +57,11 @@ Four models are compared in this checkpoint:
 
 All models are trained on the same 70/15/15 stratified split from Week 5. Features are standardized (fit on train only).
 
+**Note on KNN:** KNN (k=5) was evaluated as a Week 5 baseline. It showed a large generalization gap (val F1 0.619 → test F1 0.403), indicating it overfit the small training set. It was dropped from Week 7 comparisons in favor of models with better-understood regularization behavior.
+
 ---
 
-## 3. Cross-Validation Results
+## 5. Cross-Validation Results
 
 5-fold stratified cross-validation on the training set (n=276):
 
@@ -47,9 +79,18 @@ All models are trained on the same 70/15/15 stratified split from Week 5. Featur
 
 ---
 
-## 4. Validation and Test Results
+## 6. Validation and Test Results
 
-### Validation Set (n=59)
+### Week 5 Baselines
+
+| Model | Val Accuracy | Val F1 | Test Accuracy | Test F1 |
+|-------|-------------|--------|---------------|---------|
+| Logistic Regression (L2) | 0.678 | 0.614 | 0.650 | 0.576 |
+| KNN (k=5) | 0.746 | 0.619 | 0.533 | 0.403 |
+
+KNN had the highest validation accuracy but collapsed on the test set, confirming it overfit to local structure in the small training set. LR (L2) was the stronger baseline, with a much smaller val-to-test drop.
+
+### Week 7 Models — Validation Set (n=59)
 
 | Model | Accuracy | Precision | Recall | F1 |
 |-------|---------|-----------|--------|----|
@@ -58,7 +99,7 @@ All models are trained on the same 70/15/15 stratified split from Week 5. Featur
 | Decision Tree (depth=4) | 0.661 | 0.604 | 0.598 | 0.600 |
 | Decision Tree (full) | 0.610 | 0.569 | 0.574 | 0.570 |
 
-### Test Set (n=60)
+### Week 7 Models — Test Set (n=60)
 
 | Model | Accuracy | Precision | Recall | F1 |
 |-------|---------|-----------|--------|----|
@@ -75,7 +116,7 @@ All models are trained on the same 70/15/15 stratified split from Week 5. Featur
 
 ---
 
-## 5. Feature Importance Analysis
+## 7. Feature Importance Analysis
 
 ### Logistic Regression (L2) — Top Coefficients
 
@@ -102,7 +143,7 @@ LR (L1, C=0.1) produces a sparse model, zeroing out several low-signal features.
 
 ---
 
-## 6. Interpretability vs. Performance Tradeoffs
+## 8. Interpretability vs. Performance Tradeoffs
 
 | Model | Test F1 | Interpretability | Notes |
 |-------|--------|-----------------|-------|
@@ -115,12 +156,51 @@ The depth-limited Decision Tree is the strongest model and also one of the more 
 
 ---
 
-## 7. Preliminary Conclusions
+## 9. Decision Tree Rules in Plain English
 
-1. **`failures` is the single most informative feature** across all models. Students with prior failures are at significantly higher risk. This is actionable: it is available at the start of the year from school records.
+One advantage of the pruned Decision Tree over logistic regression is that its decision logic can be read directly. The root split and first two levels account for the majority of predictions:
 
-2. **Pruned Decision Tree (depth=4) gives the best generalization** on this dataset. The gain over logistic regression (F1 0.643 vs. 0.576) is meaningful given the small dataset.
+- **If a student has no prior course failures (`failures < 0.5`):** the tree predicts pass for most of these students, especially if they also want to pursue higher education (`higher = 1`). This group has the highest pass rate.
+- **If a student has one or more prior failures (`failures ≥ 0.5`):** the tree becomes more cautious. Students with high absences or lower parental education are predicted to fail. Students who still intend to pursue higher education have a better chance even in this group.
+- **Absences** serve as a secondary split in the failing-risk branch: high absenteeism compounds the risk from prior failures.
+- **Parental education (`Medu`)** appears in deeper splits as a supporting signal when the primary indicators are ambiguous.
 
-3. **Simple models are competitive.** The gap between the pruned tree and an unconstrained tree (F1 0.643 vs. 0.563) shows that complexity hurts here. The project's central claim — that interpretable models can perform well — is supported.
+This rule structure is directly usable by a counselor or advisor: a student with no prior failures and clear educational goals is low-risk; a student with even one failure and poor attendance warrants early outreach.
 
-4. **All models are limited by dataset size.** With only 60 test samples, metric differences of ~0.05 F1 should be interpreted cautiously. The cross-validation results (which use more data per evaluation) provide a more reliable picture of model ranking.
+---
+
+## 10. Final Conclusions
+
+1. **`failures` is the single most informative feature** across all models. Students with prior failures are at significantly higher risk. This is actionable: the feature is available from school records at the start of the year.
+
+2. **The pruned Decision Tree (depth=4) is the best model.** It achieves the highest test F1 (0.643) and recall (0.637) while remaining fully interpretable. The gain over the best logistic regression variant (F1 0.576) is meaningful for a dataset of this size, and it is confirmed by the decision rules being consistent with the logistic regression coefficients.
+
+3. **Simple models are competitive — complexity hurts.** The unconstrained Decision Tree has a lower test F1 (0.563) than the pruned version (0.643), and both logistic regression variants underperform the pruned tree. The project's central claim — that interpretable models can perform well enough to be practically useful — is supported.
+
+4. **The top features are consistent across all four models.** `failures`, `higher`, and `absences` appear as the strongest predictors in both the logistic regression coefficients and the decision tree splits. This cross-model consistency increases confidence that these features are genuinely informative, not noise.
+
+5. **Metric differences should be interpreted cautiously given dataset size.** With only 60 test samples, a difference of 0.05 F1 is not statistically conclusive on its own. The cross-validation results (which use more data per evaluation) provide a more reliable picture of model ranking and are consistent with the test set ordering.
+
+---
+
+## 11. Limitations
+
+**Dataset size.** With 395 students total and only 60 in the test set, all reported metrics have wide confidence intervals. The pruned Decision Tree's advantage over logistic regression is directionally consistent across CV and test, but a larger dataset would be needed to draw firm conclusions.
+
+**Single school and subject.** The dataset covers one Portuguese school and one subject (math). The feature patterns — particularly the weight of `failures` and `higher` — may not transfer to different educational systems, grade levels, or subjects.
+
+**Excluded grade features.** G1 and G2 (first and second period grades) were excluded by design to focus on behavioral and demographic predictors rather than prior grades. This reflects a realistic early-intervention setting, but a model that included G1/G2 would likely have much higher accuracy. The tradeoff is intentional but worth naming.
+
+**No regularization tuning for LR (L1).** The L1 model uses C=0.1, which produces a sparse but over-regularized model on 276 training samples. A proper sweep over C values would be needed to fairly evaluate L1 logistic regression. As presented, it is better understood as a demonstration of what over-regularization looks like than as a competitive model.
+
+**Interpretability is qualitative.** The interpretability analysis relies on visual inspection of feature importances and decision rules rather than a formal measure. Metrics like number of active features or decision path length would make the comparison more rigorous.
+
+---
+
+## 12. Future Improvements
+
+- **Tune regularization strength.** A grid search over C values for the L1 logistic regression would give a fairer comparison and may close some of the performance gap with the Decision Tree.
+- **Add a Random Forest as a performance ceiling.** Comparing the pruned Decision Tree against a Random Forest (which sacrifices interpretability for performance) would quantify exactly how much accuracy the interpretability constraint costs.
+- **Formalize interpretability measurement.** Counting active features, measuring average decision path length, or using a tool like SHAP to explain individual predictions would make the interpretability comparison more rigorous and less qualitative.
+- **Expand to the Portuguese course data.** The UCI dataset includes a second file for the Portuguese language course. Training on a combined or multi-course dataset would improve statistical power and allow testing whether the feature patterns generalize across subjects.
+- **Validate on a different cohort.** The strongest test of these findings would be applying the trained model to a new cohort of students and measuring real-world predictive accuracy, rather than relying on a held-out split of the same dataset.
